@@ -1,11 +1,8 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-import plotly.express as px
-import statsmodels.api as sm
+import numpy as np
 
 def render_elasticity_modeling():
-    # === Styles ===
     st.markdown("""
         <style>
             #MainMenu, footer {visibility: hidden;}
@@ -23,148 +20,106 @@ def render_elasticity_modeling():
         </style>
     """, unsafe_allow_html=True)
 
-    # === Section Header ===
     st.markdown("""
         <div style="background-color:#e8f1fa;padding:12px 18px;border-radius:8px;margin-bottom:10px;">
-            <h3 style='color:#0A5A9C;margin:0;'>📐 Elasticity Modeling: Independent Drivers vs Headcount</h3>
+            <h3 style='color:#0A5A9C;margin:0;'>Elasticity Modeling:Using Low Intercorrelation Drivers with High Headcount Functions</h3>
         </div>
     """, unsafe_allow_html=True)
 
-    # === Session Validation ===
-    required_keys = [
-        "independent_driver_table",
-        "business_driver_table",
-        "headcount_table",
-        "headcount_years",
-        "driver_function_mapping"
-    ]
-    missing_keys = [k for k in required_keys if k not in st.session_state]
-    if missing_keys:
-        st.warning(f"Missing required session data: {', '.join(missing_keys)}")
-        st.stop()
+    if "clean_driver_data" not in st.session_state or not st.session_state["clean_driver_data"]:
+        st.warning("❗ No driver data available. Please run the correlation module first.")
+        return
 
-    # === Load Session Data ===
-    df_indep = st.session_state["independent_driver_table"]
-    df_drivers = st.session_state["business_driver_table"]
-    df_headcount = st.session_state["headcount_table"]
-    years = st.session_state["headcount_years"]
-    mapping = st.session_state["driver_function_mapping"]
+    clean_drivers = st.session_state["clean_driver_data"]
+    st.subheader(" Elasticity Estimates Using Simplified Linear Model")
 
-    results = []
-    skipped = []
-    model_options = {}
-    final_selected_models = {}
+    elasticity_results = []
 
-    # === Modeling ===
-    for _, row in df_indep.iterrows():
-        driver = row["Driver"]
-        functions = mapping.get(driver, [])
+    for item in clean_drivers:
+        driver = item["Driver"]
+        funcs = item["Function_Units"]
 
         try:
-            driver_vals = df_drivers[df_drivers["Business Driver"] == driver][years].iloc[0]
-            driver_vals = pd.to_numeric(driver_vals, errors="coerce")
-        except:
-            skipped.append({"Driver": driver, "Reason": "Missing or invalid driver KPI values"})
-            continue
+            x_vals = pd.Series(item["Driver_Values"])
+            y_vals = pd.Series(item["Headcount_Values"])
+            x_vals, y_vals = x_vals.align(y_vals, join="inner")
 
-        hc_subset = df_headcount[df_headcount["Function Unit"].isin(functions)]
-        headcount_vals = hc_subset[years].apply(pd.to_numeric, errors="coerce").sum()
+            # Remove pairs where driver is zero or headcount is zero
+            valid_mask = (x_vals != 0) & (y_vals != 0) & x_vals.notna() & y_vals.notna()
+            x_clean = x_vals[valid_mask]
+            y_clean = y_vals[valid_mask]
 
-        valid_years = [y for y in years if pd.notna(driver_vals[y]) and pd.notna(headcount_vals[y])]
-        if len(valid_years) < 2:
-            skipped.append({"Driver": driver, "Reason": "Fewer than 2 valid years of data"})
-            continue
+            if len(x_clean) < 2:
+                st.warning(f"⚠️ Skipped driver '{driver}' – not enough valid (non-zero) data points.")
+                continue
 
-        x = driver_vals[valid_years]
-        y = headcount_vals[valid_years]
+            # Calculate slope (ΔY / ΔX using linear regression)
+            x_mean = x_clean.mean()
+            y_mean = y_clean.mean()
+            cov = np.mean((x_clean - x_mean) * (y_clean - y_mean))
+            var_x = np.mean((x_clean - x_mean) ** 2)
+            slope = cov / var_x
 
-        if x.nunique() < 2 or y.nunique() < 2:
-            skipped.append({"Driver": driver, "Reason": "No variation in data (constant values)"})
-            continue
+            # Simplified elasticity formula
+            elasticity = slope * (x_mean / y_mean)
 
-        try:
-            # Linear
-            X_lin = sm.add_constant(x)
-            model_lin = sm.OLS(y, X_lin).fit()
-            r2_lin = model_lin.rsquared
-            p_lin = model_lin.pvalues[1]
-            slope_lin = model_lin.params[1]
-            elasticity_lin = slope_lin * (x.mean() / y.mean())
-
-            # Log–Log
-            x_log = np.log(x)
-            y_log = np.log(y)
-            X_log = sm.add_constant(x_log)
-            model_log = sm.OLS(y_log, X_log).fit()
-            r2_log = model_log.rsquared
-            p_log = model_log.pvalues[1]
-            slope_log = model_log.params[1]
-
-            # Recommendation
-            recommended_model = "Log–Log" if (r2_log > r2_lin and p_log < 0.05) else "Linear"
-            model_options[driver] = {
-                "log": {"model": model_log, "r2": r2_log, "p": p_log, "elasticity": slope_log},
-                "lin": {"model": model_lin, "r2": r2_lin, "p": p_lin, "elasticity": elasticity_lin},
-                "rec": recommended_model
-            }
-
-            elasticity = slope_log if recommended_model == "Log–Log" else elasticity_lin
-            r2 = r2_log if recommended_model == "Log–Log" else r2_lin
-            p_val = p_log if recommended_model == "Log–Log" else p_lin
-
-            results.append({
+            elasticity_results.append({
                 "Driver": driver,
-                "Recommended Model": recommended_model,
+                "Function Units": ", ".join(funcs),
                 "Elasticity": round(elasticity, 3),
-                "R²": round(r2, 3),
-                "p-value": round(p_val, 4),
-                "Significant": "✅ Yes" if p_val < 0.05 else "⚠️ No"
+                "Mean Driver": round(x_mean, 2),
+                "Mean Headcount": round(y_mean, 2),
+                "Data Points Used": len(x_clean)
             })
 
         except Exception as e:
-            skipped.append({"Driver": driver, "Reason": f"Regression error: {e}"})
+            st.error(f" Elasticity calc failed for driver '{driver}': {e}")
             continue
 
-    # === Display Results ===
-    if results:
-        df_results = pd.DataFrame(results)
-        st.dataframe(df_results, use_container_width=True)
+    if not elasticity_results:
+        st.warning(" No valid elasticity values could be estimated.")
+        return
 
-        st.markdown("### 📊 Explanation Table")
-        st.markdown("""
-        | Criteria | Description |
-        |----------|-------------|
-        | R² | Goodness of fit – higher is better |
-        | p-value | Statistical significance (< 0.05 is good) |
-        | Elasticity | % impact on headcount per 1% change in driver |
-        """)
+    df_results = pd.DataFrame(elasticity_results)
+    st.dataframe(df_results, use_container_width=True)
+    st.session_state["elasticity_table"] = df_results
 
-        st.markdown("### 🔧 Manual Override of Recommended Models")
+    st.subheader("💥 Most Impactful Driver per Function Unit")
 
-        for i, row in df_results.iterrows():
-            driver = row["Driver"]
-            recommended = row["Recommended Model"]
-            override = st.radio(
-                f"Select model for **{driver}**", ["Log–Log", "Linear"],
-                index=["Log–Log", "Linear"].index(recommended),
-                key=f"{driver}_model"
-            )
-            model_obj = model_options[driver]["log"] if override == "Log–Log" else model_options[driver]["lin"]
-            final_selected_models[driver] = {
-                "Model": override,
-                "Elasticity": round(model_obj["elasticity"], 3),
-                "R²": round(model_obj["r2"], 3),
-                "p-value": round(model_obj["p"], 4)
-            }
+    func_impacts = {}
+    for row in elasticity_results:
+        for func in row["Function Units"].split(", "):
+            if func not in func_impacts or abs(row["Elasticity"]) > abs(func_impacts[func]["Elasticity"]):
+                func_impacts[func] = {
+                    "Driver": row["Driver"],
+                    "Elasticity": row["Elasticity"]
+                }
 
-        st.session_state["elasticity_table"] = df_results
-        st.session_state["selected_elasticity"] = final_selected_models
+    df_impact = pd.DataFrame([
+        {
+            "Function Unit": func,
+            "Most Impactful Driver": data["Driver"],
+            "Elasticity": data["Elasticity"]
+        }
+        for func, data in func_impacts.items()
+    ])
+    st.dataframe(df_impact, use_container_width=True)
+    st.session_state["function_impact_mapping"] = df_impact
 
-    else:
-        st.info("ℹ️ No valid elasticity models could be computed.")
+    st.subheader("🗣️ Business Planning Insights")
+    narratives = []
+    for _, row in df_impact.iterrows():
+        func = row["Function Unit"]
+        driver = row["Most Impactful Driver"]
+        elasticity = row["Elasticity"]
+        impact = round(elasticity * 100)
+        direction = "increase" if elasticity > 0 else "decrease"
+        narratives.append(
+            f" A 1% increase in **{driver}** has an impact of **{abs(impact)}%** {direction} on **{func}** function unit."
+)
 
-    # === Skipped Drivers Diagnostics ===
-    if skipped:
-        st.subheader("⚠️ Skipped Drivers (Diagnostics)")
-        df_skipped = pd.DataFrame(skipped)
-        st.dataframe(df_skipped, use_container_width=True)
+    for n in narratives:
+        st.markdown(n)
+
+    st.session_state["insight_narratives"] = narratives
+

@@ -47,8 +47,4 @@ font = "sans serif"
 [layout]
 wideMode = true
 
-# .streamlit/secrets.toml
-
-ADZUNA_APP_ID = "your_adzuna_app_id_here"
-ADZUNA_APP_KEY = "your_adzuna_api_key_here"
 
