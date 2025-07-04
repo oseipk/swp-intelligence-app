@@ -10,8 +10,6 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 import feedparser
 import requests
-import spacy
-nlp = spacy.load("en_core_web_sm")
 
 
 # Add root path for import resolution
