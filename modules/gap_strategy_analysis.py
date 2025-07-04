@@ -48,10 +48,6 @@ import pandas as pd
 import plotly.express as px
 from modules import ui
 
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-
 def inject_custom_styles():
     st.markdown("""
         <style>

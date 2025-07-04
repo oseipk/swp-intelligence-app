@@ -30,7 +30,7 @@ def section_header(title: str):
 
 def render_scenario_planning():
     inject_custom_styles()
-    section_header("📊 Scenario Planning: Workforce Demand vs. Supply")
+    section_header("Scenario Planning: Workforce Demand vs. Supply")
 
     if "scenario_planning_forecast" not in st.session_state:
         st.warning("❗ Please complete the Critical Workforce Forecasting step first.")
@@ -125,7 +125,7 @@ def render_scenario_planning():
         "Workforce Gap": role_gap[[f"Gap {y}" for y in forecast_years]].sum().values
     })
 
-    st.subheader("📈 Summary Forecast (Total)")
+    st.subheader("📈 Summary Forecast")
     st.dataframe(result_df, use_container_width=True)
 
     melt_df = result_df.melt(id_vars="Year", var_name="Metric", value_name="Headcount")

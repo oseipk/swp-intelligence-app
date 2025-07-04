@@ -24,7 +24,7 @@ def render_critical_workforce_forecasting():
     headcount_years = st.session_state["headcount_years"]
     forecast_years = [str(int(headcount_years[-1]) + i) for i in range(1, 5)]
 
-    # === Step 1: Define Critical Roles
+    # Step 1: Define Critical Roles
     st.subheader("🧑‍💼 Define Critical Roles")
     roles_input = st.text_area(
         "Enter critical roles (comma-separated)",
@@ -38,7 +38,7 @@ def render_critical_workforce_forecasting():
         st.info("Please input at least one critical role.")
         return
 
-    # === Step 2: Map Roles to Function Units
+    # Step 2: Map Roles to Function Units
     st.subheader("🏭 Role to Function Unit Assignment")
     all_funcs = df_headcount["Function Unit"].unique().tolist()
 
@@ -56,7 +56,7 @@ def render_critical_workforce_forecasting():
         )
         role_func_map[role] = func
 
-    # === Step 3: Assign Roles to Drivers with Weights
+    # Step 3: Assign Roles to Drivers with Weights
     st.subheader("Assign Roles to Drivers and Weights")
 
     if "driver_role_weights" not in st.session_state:
@@ -95,7 +95,7 @@ def render_critical_workforce_forecasting():
         st.warning("❗ Fix weighting errors above before running the forecast.")
         return
 
-    # === Step 4: Forecast Logic
+    # Step 4: Forecast Logic
     st.subheader("📈 Forecasted Critical Role Headcount")
     st.markdown("""
     <div style="background-color:#e8f1fa;padding:12px;border-radius:6px;margin-bottom:10px;">
@@ -127,7 +127,7 @@ def render_critical_workforce_forecasting():
             func = role_func_map[role]
             func_df = df_headcount[df_headcount["Function Unit"] == func]
             if func_df.empty or func_df.shape[0] > 1:
-                continue  
+                continue
 
             base_hc_vals = pd.to_numeric(func_df[headcount_years].iloc[0], errors="coerce")
             base_hc = np.nanmean(base_hc_vals)
@@ -158,25 +158,43 @@ def render_critical_workforce_forecasting():
 
     st.dataframe(df_results, use_container_width=True)
     st.session_state["critical_role_forecast"] = df_results
-    st.session_state["scenario_planning_forecast"] = df_results  # ⬅️ Save for scenario planning module
+    st.session_state["scenario_planning_forecast"] = df_results
 
-    # === Step 5: Sum Forecast by Function Unit
+    # Step 5: Summarize Forecast by Function Unit
     st.subheader("📊 Summarized Forecast by Function Unit")
     forecast_cols = [f"Forecast {yr}" for yr in forecast_years]
     summary = df_results[["Function Unit"] + forecast_cols]
     func_summary = summary.groupby("Function Unit")[forecast_cols].sum().reset_index()
     st.dataframe(func_summary, use_container_width=True)
 
-    # === Optional: Visualization
+    # Visualization (Modified: Summed by Role)
     st.subheader("📉 Forecasted Headcount by Role")
     try:
-        chart_df = df_results.melt(
-            id_vars=["Role"],
+        chart_df = df_results[["Role"] + forecast_cols]
+        summed_df = chart_df.groupby("Role")[forecast_cols].sum().reset_index()
+
+        melt_df = summed_df.melt(
+            id_vars="Role",
             value_vars=forecast_cols,
-            var_name="Year", value_name="Forecasted Headcount"
+            var_name="Year",
+            value_name="Forecasted Headcount"
         )
-        chart_df["Year"] = chart_df["Year"].str.extract(r"(\d{4})")
-        fig = px.line(chart_df, x="Year", y="Forecasted Headcount", color="Role", markers=True)
+        melt_df["Year"] = melt_df["Year"].str.extract(r"(\d{4})")
+
+        fig = px.line(
+            melt_df,
+            x="Year",
+            y="Forecasted Headcount",
+            color="Role",
+            markers=True,
+            title="Summed Forecasted Headcount per Role"
+        )
+        fig.update_layout(
+            template="plotly_white",
+            font=dict(family="Arial", size=12, color="#333"),
+            margin=dict(l=40, r=20, t=50, b=40)
+        )
         st.plotly_chart(fig, use_container_width=True)
+
     except Exception as e:
         st.error(f"Chart rendering failed: {e}")
