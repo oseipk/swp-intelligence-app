@@ -42,9 +42,17 @@ def render_driver_definition():
     section_header("Business Demand Drivers")
 
     predefined_drivers = [
-        "e-Intensity (%)", "e-NNS", "E-Commerce growth", "Marketing spend in Digital media (%)",
+        "e-Intensity (%)", "e-NNS",
+         "E-Commerce growth", "Marketing spend in Digital media (%)",
         "Finished Good Inventory (# of days)", "Organic Growth(%)",
-        "Customer Order Fulfillment(%)", "On-Time In Full(%)"
+        "Customer Order Fulfillment(%)", "On-Time In Full(%)",
+        "Raw & Pack Inventory (# of days)","No of M&As",
+        "Total number of Applications", "Projects Started",
+        "# of Changes - Change and Release Management","# Sustain tickets in ServiceNow",
+        "No more critical incidents (P1/P2) than end of last year","Increase % of average of consecutive days without critical incidents (P1/P2)",
+        "Meet expected system availability target","Complete number of operational importance site mapping",
+        "Meet % of all incident failures and requests solved/closed in less than 24 hours by Q4 2024",
+        "Meet Security and Compliance Index target"
     ]
 
     # Reset logic
