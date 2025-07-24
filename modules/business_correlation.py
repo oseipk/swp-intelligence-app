@@ -86,17 +86,17 @@ def render_driver_headcount_correlation():
 
         try:
             r, p = pearsonr(x, y)
-            if abs(r) >= 0.5:  # High correlation threshold
-                correlation_summary.append({
+            # if abs(r) >= 0.5:  # High correlation threshold
+            correlation_summary.append({
                     "Driver": driver,
                     "Function Units": ", ".join(funcs),
                     "Correlation": round(r, 3),
                     "p-value": round(p, 4),
                     "Significant": "✅ Yes" if p < 0.05 else "⚠️ No"
                 })
-                driver_vectors[driver] = x
-                driver_headcounts[driver] = y
-                driver_mappings[driver] = funcs
+            driver_vectors[driver] = x
+            driver_headcounts[driver] = y
+            driver_mappings[driver] = funcs
         except:
             continue
 
@@ -116,15 +116,15 @@ def render_driver_headcount_correlation():
         use_container_width=True
     )
 
-    st.subheader("✅ Filter Drivers with Intercorrelation < 0.7")
-    threshold = 0.7
+    st.subheader("✅ Filter Drivers with Intercorrelation < 0.5")
+    threshold = 0.5
     corr_abs = corr_matrix.abs()
     clean_drivers = [
         d for d in corr_abs.columns if all(corr_abs[d].drop(d) < threshold)
     ]
 
     if not clean_drivers:
-        st.warning("No drivers meet the intercorrelation threshold (< 0.7).")
+        st.warning("No drivers meet the intercorrelation threshold (< 0.5).")
         return
 
     st.success(f"{len(clean_drivers)} driver(s) passed the intercorrelation filter.")
