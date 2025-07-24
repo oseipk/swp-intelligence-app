@@ -112,7 +112,7 @@ def render_driver_headcount_correlation():
     corr_matrix = df_driver_matrix.T.corr(method="pearson").round(2)
     st.plotly_chart(
         px.imshow(corr_matrix, text_auto=True, color_continuous_scale="RdBu", zmin=-1, zmax=1,
-                  title="Driver Intercorrelation Matrix, Threshold < 0.7"),
+                  title="Driver Intercorrelation Matrix, Threshold < 0.5"),
         use_container_width=True
     )
 
